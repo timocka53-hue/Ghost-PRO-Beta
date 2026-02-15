@@ -1,20 +1,33 @@
-name: Build Heavy APK
+name: Build Ghost PRO
 on: [push]
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Python
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Deps
-        run: pip install flet flet_audio cryptography
-      - name: Build
-        run: flet build apk --project "GhostPRO" --include-all-assets --release
-      - name: Upload
+
+      - name: Install Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0' # Нужно для сборки APK через Flet
+
+      - name: Install Dependencies
+        run: |
+          pip install flet cryptography flet_audio
+
+      - name: Build APK
+        run: |
+          # Используем правильную команду для актуального Flet
+          flet build apk --project "GhostPRO"
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO_V12
+          name: GhostPRO-Release
           path: build/apk/*.apk
