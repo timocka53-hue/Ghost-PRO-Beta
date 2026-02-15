@@ -1,4 +1,5 @@
 flet>=0.21.0
-flet_audio
-cryptography
 firebase-admin
+cryptography
+flet_audio
+
