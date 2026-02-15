@@ -11,13 +11,17 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
-      - name: Install Dependencies
+      - name: Install
         run: pip install flet firebase-admin
       - name: Build Android APK
         run: |
-          # Убрал кривые аргументы, оставил только чистый билд
+          # Используем только название проекта
           flet build apk --project "Ghost PRO"
-      - name: Upload Artifact
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GhostPRO-APK
+          path: build/apk/*.apk
+
         uses: actions/upload-artifact@v4
         with:
           name: GhostPRO-Final
