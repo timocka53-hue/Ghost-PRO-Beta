@@ -1,23 +1,20 @@
-name: BUILD_GHOST_NATIVE
+name: Build Heavy APK
 on: [push]
-
 jobs:
-  android:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Install Briefcase
-        run: pip install briefcase
-      - name: Build APK
-        run: |
-          briefcase create android --no-input
-          briefcase build android --no-input
+          python-version: '3.10'
+      - name: Deps
+        run: pip install flet flet_audio cryptography
+      - name: Build
+        run: flet build apk --project "GhostPRO" --include-all-assets --release
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Ghost-Native-APK
-          path: "**/build/**/*.apk"
+          name: GhostPRO_V12
+          path: build/apk/*.apk
