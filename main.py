@@ -1,153 +1,89 @@
 import flet as ft
 import datetime
 import firebase_admin
-from firebase_admin import credentials, firestore, storage
-import threading
-import time
-
-# --- КОНФИГ ТВОЕГО ПРОЕКТА ---
-try:
-    if not firebase_admin._apps:
-        cred = credentials.Certificate("serviceAccountKey.json")
-        firebase_admin.initialize_app(cred, {
-            'storageBucket': 'ghost-pro-5aa22.firebasestorage.app'
-        })
-    db = firestore.client()
-    bucket = storage.bucket()
-except Exception as e:
-    # Если файла нет, приложение не упадет в черный экран, а покажет ошибку в UI
-    print(f"Критическая ошибка инициализации: {e}")
+from firebase_admin import credentials, firestore
 
 def main(page: ft.Page):
-    page.title = "Ghost PRO Beta"
+    # УСТАНОВКА НАЗВАНИЯ И ДИЗАЙНА
+    page.title = "Ghost PRO"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = "#000000"
-    page.padding = 10
-    
-    state = {"uid": None, "role": "USER", "active_chat": None}
-    chat_container = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True, spacing=10)
+    page.padding = 0
+    page.window_resizable = False
 
-    # --- СИСТЕМА УВЕДОМЛЕНИЙ ---
-    def send_notification(title, body):
-        page.show_snack_bar(
-            ft.SnackBar(
-                content=ft.Row([
-                    ft.Icon(ft.icons.NOTIFICATIONS_ACTIVE, color="#00FF00"),
-                    ft.Text(f"{title}: {body}", color="#00FF00", weight="bold")
-                ]),
-                bgcolor="#111111",
-                duration=3000
+    # Инициализация Firebase (с защитой от вылета)
+    db = None
+    try:
+        if not firebase_admin._apps:
+            cred = credentials.Certificate("serviceAccountKey.json")
+            firebase_admin.initialize_app(cred)
+        db = firestore.client()
+    except Exception as e:
+        print(f"Firebase Offline: {e}")
+
+    state = {"uid": None, "active_chat": None}
+
+    # ГРАФИКА: ЭКРАН ВХОДА
+    def login_screen():
+        page.clean()
+        user_in = ft.TextField(label="USER_ID", border_color="#00FF00", width=280)
+        pass_in = ft.TextField(label="ACCESS_KEY", password=True, border_color="#00FF00", width=280)
+        
+        def connect_click(e):
+            if user_in.value:
+                state["uid"] = f"@{user_in.value}"
+                messenger_ui()
+
+        page.add(
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("GHOST PRO", size=45, weight="bold", color="#00FF00", italic=True),
+                    ft.Text("MATRIX ENCRYPTED NETWORK", size=12, color="#00FF00"),
+                    ft.Divider(height=20, color="transparent"),
+                    user_in, pass_in,
+                    ft.ElevatedButton("INITIALIZE", on_click=connect_click, bgcolor="#002200", color="#00FF00", width=280)
+                ], horizontal_alignment="center"),
+                alignment=ft.alignment.center, expand=True
             )
         )
 
-    # --- ЛОГИКА ЧАТА И ПОИСКА ---
-    def on_message_update(docs, changes, read_time):
-        if not state["active_chat"]: return
-        
-        chat_container.controls.clear()
-        for doc in docs:
-            m = doc.to_dict()
-            is_me = m.get("user") == state["uid"]
-            
-            # Если сообщение новое и не от нас — пищим уведомлением
-            if any(c.type.name == 'ADDED' for c in changes) and not is_me:
-                send_notification("НОВОЕ СООБЩЕНИЕ", m.get("text", "Медиафайл"))
-
-            chat_container.controls.append(
-                ft.Container(
-                    content=ft.Column([
-                        ft.Text(m.get("user"), size=10, color="#00FF00", weight="bold"),
-                        ft.Text(m.get("text"), color="white", size=15),
-                    ]),
-                    alignment=ft.alignment.center_right if is_me else ft.alignment.center_left,
-                    padding=12,
-                    bgcolor="#0A0A0A" if is_me else "#151515",
-                    border_radius=15,
-                    border=ft.border.all(1, "#00FF00" if is_me else "#333333"),
-                )
-            )
-        page.update()
-
-    def start_private_chat(target_uid):
-        if not target_uid.startswith("@"): target_uid = f"@{target_uid}"
-        # Создаем уникальный ID для двоих (анонимная личка)
-        chat_id = "_".join(sorted([state["uid"], target_uid]))
-        state["active_chat"] = chat_id
-        
-        # Слушаем именно эту личку в реальном времени
-        db.collection("chats").document(chat_id).collection("messages").order_by("ts").on_snapshot(on_message_update)
-        show_chat_screen(target_uid)
-
-    # --- ЭКРАНЫ ---
-    def show_chat_screen(partner):
+    # ГРАФИКА: ОСНОВНОЙ МЕССЕНДЖЕР (ДИЗАЙН)
+    def messenger_ui():
         page.clean()
-        msg_input = ft.TextField(hint_text="Зашифрованное сообщение...", expand=True, border_color="#00FF00")
-        
-        def send_click(e):
-            if msg_input.value:
-                db.collection("chats").document(state["active_chat"]).collection("messages").add({
+        chat_area = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True)
+        msg_input = ft.TextField(hint_text="CRYPT_MSG...", expand=True, border_color="#00FF00")
+
+        def send_msg(e):
+            if msg_input.value and db:
+                db.collection("public_chat").add({
                     "user": state["uid"],
                     "text": msg_input.value,
-                    "ts": firestore.SERVER_TIMESTAMP,
-                    "type": "text"
+                    "ts": firestore.SERVER_TIMESTAMP
                 })
                 msg_input.value = ""
                 page.update()
 
         page.add(
             ft.Column([
-                ft.Row([
-                    ft.IconButton(ft.icons.ARROW_BACK, on_click=lambda _: show_main_menu()),
-                    ft.Text(f"ЧАТ С {partner}", color="#00FF00", weight="bold"),
-                    ft.IconButton(ft.icons.ADMIN_PANEL_SETTINGS, icon_color="red", visible=state["role"]=="ADMIN")
-                ], justify="spaceBetween"),
-                ft.Container(content=chat_container, expand=True, padding=10),
-                ft.Row([
-                    ft.IconButton(ft.icons.ADD_A_PHOTO, on_click=lambda _: page.show_snack_bar(ft.SnackBar(ft.Text("Медиа доступно в Pro")))),
-                    msg_input,
-                    ft.IconButton(ft.icons.SEND, icon_color="#00FF00", on_click=send_click)
-                ])
+                ft.Container(
+                    content=ft.Row([
+                        ft.Text("GHOST PRO V13", color="#00FF00", weight="bold"),
+                        ft.Icon(ft.icons.CIRCLE, color="green", size=10)
+                    ], justify="spaceBetween"),
+                    padding=15, bgcolor="#111111"
+                ),
+                ft.Container(content=chat_area, expand=True, padding=20),
+                ft.Container(
+                    content=ft.Row([
+                        ft.IconButton(ft.icons.ADD_BOX_OUTLINED, icon_color="#00FF00"),
+                        msg_input,
+                        ft.IconButton(ft.icons.SEND_ROUNDED, icon_color="#00FF00", on_click=send_msg)
+                    ]),
+                    padding=10, bgcolor="#050505"
+                )
             ], expand=True)
         )
 
-    def show_main_menu():
-        page.clean()
-        search_uid = ft.TextField(label="ПОИСК ЮЗЕРА ПО @ID", border_color="#00FF00")
-        page.add(
-            ft.Container(
-                content=ft.Column([
-                    ft.Text("GHOST PRO BETA", size=32, color="#00FF00", weight="bold"),
-                    ft.Text(f"ВАШ ID: {state['uid']}", color="#555555"),
-                    search_uid,
-                    ft.ElevatedButton("НАЙТИ И НАЧАТЬ ЧАТ", on_click=lambda _: start_private_chat(search_uid.value), bgcolor="#002200", color="#00FF00"),
-                    ft.Divider(color="#222222"),
-                    ft.Text("АКТИВНЫЕ ДИАЛОГИ ПОЯВЯТСЯ ТУТ", size=12, color="#333333")
-                ], horizontal_alignment="center", spacing=20),
-                alignment=ft.alignment.center, expand=True
-            )
-        )
-
-    # --- ВХОД ---
-    user_in = ft.TextField(label="ПРИДУМАЙТЕ ЮЗЕРНЕЙМ", border_color="#00FF00")
-    pass_in = ft.TextField(label="КОД ДОСТУПА", password=True, border_color="#00FF00")
-
-    def login_done(e):
-        if user_in.value:
-            state["uid"] = f"@{user_in.value}"
-            if user_in.value == "adminpan" and pass_in.value == "TimaIssam2026":
-                state["role"] = "ADMIN"
-            show_main_menu()
-
-    page.add(
-        ft.Container(
-            content=ft.Column([
-                ft.Icon(ft.icons.VIGNETTE, size=100, color="#00FF00"),
-                ft.Text("MATRIX NETWORK V13", size=24, weight="bold", color="#00FF00"),
-                user_in, pass_in,
-                ft.ElevatedButton("СОЗДАТЬ СЕССИЮ", on_click=login_done, width=300, bgcolor="#002200", color="#00FF00")
-            ], horizontal_alignment="center", spacing=25),
-            alignment=ft.alignment.center, expand=True
-        )
-    )
+    login_screen()
 
 ft.app(target=main)
