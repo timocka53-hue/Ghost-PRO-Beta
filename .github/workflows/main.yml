@@ -1,0 +1,23 @@
+name: BUILD_GHOST_NATIVE
+on: [push]
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Briefcase
+        run: pip install briefcase
+      - name: Build APK
+        run: |
+          briefcase create android --no-input
+          briefcase build android --no-input
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ghost-Native-APK
+          path: "**/build/**/*.apk"
