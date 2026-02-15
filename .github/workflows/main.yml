@@ -6,28 +6,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
-      - name: Install Flutter SDK
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0' # Нужно для сборки APK через Flet
-
-      - name: Install Dependencies
-        run: |
-          pip install flet cryptography flet_audio
-
+          flutter-version: '3.19.0'
+      - name: Install Flet
+        run: pip install flet cryptography flet_audio
       - name: Build APK
-        run: |
-          # Используем правильную команду для актуального Flet
-          flet build apk --project "GhostPRO"
-
+        run: flet build apk --project "GhostPRO"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO-Release
+          name: GhostPRO-Ultimate
           path: build/apk/*.apk
