@@ -1,6 +1,5 @@
 name: Build Ghost PRO
 on: [push]
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,14 +11,16 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
-      - name: Install Dependencies
-        run: pip install flet firebase-admin cryptography flet_audio
+      - name: Install Deps
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
       - name: Build APK
         run: |
-          # Автоматическое принятие лицензий через yes
-          yes | flet build apk --project "GhostPRO" --icon "assets/icon.png"
-      - name: Upload Artifact
+          # Упрощенная команда без лишних флагов, которые ломают билд
+          flet build apk --project "GhostPRO"
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO-Final-Build
+          name: GhostPRO-Build
           path: build/apk/*.apk
