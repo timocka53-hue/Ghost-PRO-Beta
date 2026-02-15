@@ -1,4 +1,4 @@
-name: Build Ghost PRO APK
+name: Build Ghost Private APK
 on: [push]
 jobs:
   build:
@@ -11,12 +11,11 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
-      - run: pip install flet flet_firebase
+      - run: pip install flet firebase-admin
       - name: Build
         run: |
-          # Собираем с указанием package_name из твоего json
-          flet build apk --project "GhostPRO" --package "org.ghost.ghost_messenger_secure"
+          yes | flet build apk --project "GhostPRO" --package "org.ghost.ghost_messenger_secure"
       - uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO-Final
+          name: GhostPRO-Private
           path: build/apk/*.apk
