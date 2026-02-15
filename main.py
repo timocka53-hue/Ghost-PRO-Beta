@@ -4,14 +4,17 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 def main(page: ft.Page):
-    # УСТАНОВКА НАЗВАНИЯ И ДИЗАЙНА
+    # Чистое название без лишних знаков
     page.title = "Ghost PRO"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = "#000000"
-    page.padding = 0
-    page.window_resizable = False
+    page.padding = 10
 
-    # Инициализация Firebase (с защитой от вылета)
+    # Защита от черного экрана: рисуем фон сразу
+    container = ft.Column(expand=True)
+    page.add(container)
+
+    # Тихая инициализация базы
     db = None
     try:
         if not firebase_admin._apps:
@@ -19,71 +22,53 @@ def main(page: ft.Page):
             firebase_admin.initialize_app(cred)
         db = firestore.client()
     except Exception as e:
-        print(f"Firebase Offline: {e}")
+        container.controls.append(ft.Text(f"Offline Mode: {e}", color="red"))
+        page.update()
 
-    state = {"uid": None, "active_chat": None}
+    state = {"uid": None}
 
-    # ГРАФИКА: ЭКРАН ВХОДА
-    def login_screen():
-        page.clean()
-        user_in = ft.TextField(label="USER_ID", border_color="#00FF00", width=280)
-        pass_in = ft.TextField(label="ACCESS_KEY", password=True, border_color="#00FF00", width=280)
+    def login_view():
+        user_in = ft.TextField(label="USER_ID", border_color="#00FF00")
         
-        def connect_click(e):
+        def start(e):
             if user_in.value:
                 state["uid"] = f"@{user_in.value}"
-                messenger_ui()
+                chat_view()
 
-        page.add(
-            ft.Container(
-                content=ft.Column([
-                    ft.Text("GHOST PRO", size=45, weight="bold", color="#00FF00", italic=True),
-                    ft.Text("MATRIX ENCRYPTED NETWORK", size=12, color="#00FF00"),
-                    ft.Divider(height=20, color="transparent"),
-                    user_in, pass_in,
-                    ft.ElevatedButton("INITIALIZE", on_click=connect_click, bgcolor="#002200", color="#00FF00", width=280)
-                ], horizontal_alignment="center"),
-                alignment=ft.alignment.center, expand=True
-            )
+        container.controls.clear()
+        container.controls.append(
+            ft.Column([
+                ft.Text("GHOST PRO", size=40, color="#00FF00", weight="bold"),
+                user_in,
+                ft.ElevatedButton("CONNECT", on_click=start, bgcolor="#002200", color="#00FF00")
+            ], horizontal_alignment="center")
         )
+        page.update()
 
-    # ГРАФИКА: ОСНОВНОЙ МЕССЕНДЖЕР (ДИЗАЙН)
-    def messenger_ui():
-        page.clean()
-        chat_area = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True)
-        msg_input = ft.TextField(hint_text="CRYPT_MSG...", expand=True, border_color="#00FF00")
+    def chat_view():
+        chat_list = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True)
+        msg_in = ft.TextField(hint_text="Message...", expand=True)
 
-        def send_msg(e):
-            if msg_input.value and db:
-                db.collection("public_chat").add({
+        def send(e):
+            if msg_in.value and db:
+                db.collection("public").add({
                     "user": state["uid"],
-                    "text": msg_input.value,
+                    "text": msg_in.value,
                     "ts": firestore.SERVER_TIMESTAMP
                 })
-                msg_input.value = ""
+                msg_in.value = ""
                 page.update()
 
-        page.add(
+        container.controls.clear()
+        container.controls.append(
             ft.Column([
-                ft.Container(
-                    content=ft.Row([
-                        ft.Text("GHOST PRO V13", color="#00FF00", weight="bold"),
-                        ft.Icon(ft.icons.CIRCLE, color="green", size=10)
-                    ], justify="spaceBetween"),
-                    padding=15, bgcolor="#111111"
-                ),
-                ft.Container(content=chat_area, expand=True, padding=20),
-                ft.Container(
-                    content=ft.Row([
-                        ft.IconButton(ft.icons.ADD_BOX_OUTLINED, icon_color="#00FF00"),
-                        msg_input,
-                        ft.IconButton(ft.icons.SEND_ROUNDED, icon_color="#00FF00", on_click=send_msg)
-                    ]),
-                    padding=10, bgcolor="#050505"
-                )
+                ft.Text(f"LOGGED AS: {state['uid']}", color="#00FF00"),
+                ft.Container(content=chat_list, expand=True),
+                ft.Row([msg_in, ft.IconButton(ft.icons.SEND, on_click=send)])
             ], expand=True)
         )
+        page.update()
 
-    login_screen()
+    login_view()
 
 ft.app(target=main)
