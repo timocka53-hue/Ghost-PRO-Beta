@@ -1,5 +1,3 @@
 flet>=0.21.0
-firebase-admin
-cryptography
-flet_audio
-
+flet_firebase
+datetime
