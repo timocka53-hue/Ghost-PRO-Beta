@@ -1,5 +1,6 @@
 name: Build Ghost PRO
 on: [push]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -11,16 +12,16 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
-      - name: Install Deps
+      - name: Install Dependencies
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
       - name: Build APK
         run: |
-          # Упрощенная команда без лишних флагов, которые ломают билд
-          flet build apk --project "GhostPRO"
+          # Команда БЕЗ лишних флагов, чтобы не было ошибки unrecognized arguments
+          yes | flet build apk --project "GhostPRO"
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO-Build
+          name: GhostPRO-Final
           path: build/apk/*.apk
