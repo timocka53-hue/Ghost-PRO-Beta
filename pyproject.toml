@@ -8,8 +8,8 @@ formal_name = "Ghost PRO"
 description = "Secure Encrypted Network"
 bundle = "com.ghost"
 icon = "resources/ghostpro"
-sources = ["app.py"]
-# Обязательные поля, которые он просит:
+# Указываем файл ghostpro.py как источник
+sources = ["ghostpro.py"]
 license = "MIT"
 author = "GhostDev"
 author_email = "admin@ghost.pro"
