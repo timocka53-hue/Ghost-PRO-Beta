@@ -1,16 +1,9 @@
-[tool.briefcase]
-project_name = "Ghost PRO"
-bundle = "com.ghost"
-version = "0.0.7"
-display_name = "GHOST PRO"
-
 [tool.briefcase.app.ghostpro]
 formal_name = "Ghost PRO"
 description = "Secure Encrypted Network"
 sources = ["app.py"]
+# Вот эта строка говорит, где искать иконку:
+icon = "resources/ghostpro" 
 requires = [
     "toga-android",
 ]
-
-[tool.briefcase.app.ghostpro.android]
-build_grade_dependencies = []
