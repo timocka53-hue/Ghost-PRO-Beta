@@ -1,21 +1,12 @@
-[tool.briefcase]
-project_name = "Ghost PRO"
-bundle = "com.ghost"
-version = "0.0.7"
-
-[tool.briefcase.app.ghostpro]
-formal_name = "Ghost PRO"
-description = "Secure Encrypted Network"
-bundle = "com.ghost"
-icon = "resources/ghostpro"
-sources = ["src/ghostpro"]
-license = "MIT"
-author = "GhostDev"
-author_email = "admin@ghost.pro"
-
-requires = [
-    "toga-android",
+[tool.flet.build.android]
+project_name = "Ghost PRO Matrix"
+package_name = "com.ghost.matrix.pro"
+build_number = 7
+permissions = [
+    "INTERNET",
+    "RECORD_AUDIO",
+    "CAMERA",
+    "WRITE_EXTERNAL_STORAGE",
+    "READ_EXTERNAL_STORAGE",
+    "MODIFY_AUDIO_SETTINGS"
 ]
-
-[tool.briefcase.app.ghostpro.android]
-build_grade_dependencies = []
