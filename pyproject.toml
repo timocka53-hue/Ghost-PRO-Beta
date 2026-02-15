@@ -8,8 +8,7 @@ formal_name = "Ghost PRO"
 description = "Secure Encrypted Network"
 bundle = "com.ghost"
 icon = "resources/ghostpro"
-# Указываем, что код лежит прямо в файле ghostpro.py
-sources = ["ghostpro.py"]
+sources = ["src/ghostpro"]
 license = "MIT"
 author = "GhostDev"
 author_email = "admin@ghost.pro"
