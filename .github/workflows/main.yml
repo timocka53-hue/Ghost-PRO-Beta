@@ -1,4 +1,5 @@
-name: GHOST_V13_BUILD
+
+name: Build_GHOST_V13
 on: [push]
 
 jobs:
@@ -7,27 +8,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Flutter
+      - name: Install Dependencies
+        run: |
+          pip install flet firebase-admin
+          # УБИРАЕМ ЛЮБОЕ УПОМИНАНИЕ RICH
+
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
 
-      - name: Install Dependencies
+      - name: Build APK
         run: |
-          pip install flet firebase-admin
-          # МЫ НЕ СТАВИМ RICH, ОН УБИВАЕТ БИЛД
-
-      - name: Build Android APK
-        # Флаг --accept-licenses автоматически принимает все соглашения
-        run: flet build apk --project "GhostV13" --accept-licenses
+          # Сначала обновляем кли, чтобы не было ошибок аргументов
+          pip install --upgrade flet
+          flet build apk --project "GhostV13"
         
-      - name: Upload Result
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO_V13_Final
+          name: GhostV13_Final
           path: build/apk/*.apk
