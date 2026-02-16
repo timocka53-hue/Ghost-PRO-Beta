@@ -23,11 +23,11 @@ jobs:
 
       - name: Build APK
         run: |
-          # Собираем приложение с указанием названия и пакета
-          flet build apk --project "GhostMessenger"
+          # Используем твой package_name из google-services.json
+          flet build apk --project "GhostMessenger" --org "org.ghost"
         
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO_V13_Release
+          name: GhostPRO_V13_Final
           path: build/apk/*.apk
