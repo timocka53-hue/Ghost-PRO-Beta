@@ -1,94 +1,176 @@
 import flet as ft
 import firebase_admin
-from firebase_admin import credentials, firestore
-import base64, datetime
+from firebase_admin import credentials, firestore, storage
+import datetime
+import base64
+import os
 
 def main(page: ft.Page):
+    # --- ТВОЙ АХУЕННЫЙ ВИЗУАЛ ---
     page.title = "GHOST PRO V13"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = "#000000"
-    
-    # Конфиг админки
-    ADM_USER = "adminpan"
-    ADM_PASS = "TimaIssam2026"
+    page.padding = 0
+    page.window_width = 450
+    page.window_height = 850
 
-    class State:
+    class SystemState:
         db = None
-        user = ""
+        bucket = None
+        user = "GHOST"
         role = "USER"
+        is_auth = False
 
-    st = State()
+    st = SystemState()
 
-    # Инициализация базы
-    def init_db():
+    # --- ШИФРОВАНИЕ ДАННЫХ ---
+    def x_crypt(data, mode="e"):
+        try:
+            if mode == "e": return base64.b64encode(data.encode()).decode()
+            return base64.b64decode(data.encode()).decode()
+        except: return data
+
+    # --- ПОДКЛЮЧЕНИЕ БАЗЫ (АВТОМАТИЧЕСКОЕ) ---
+    def init_matrix():
         try:
             if not firebase_admin._apps:
                 cred = credentials.Certificate("serviceAccountKey.json")
-                firebase_admin.initialize_app(cred)
+                firebase_admin.initialize_app(cred, {'storageBucket': 'ghost-v13.appspot.com'})
             st.db = firestore.client()
+            st.bucket = storage.bucket()
             return True
         except: return False
 
-    # Элементы чата
-    chat_list = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True)
+    container = ft.Column(expand=True, spacing=0)
+    page.add(container)
 
-    def on_msg(docs, changes, read_time):
-        chat_list.controls.clear()
+    # --- ЧАТ И МЕДИА ---
+    chat_messages = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True, spacing=12)
+
+    def sync_data(docs, changes, read_time):
+        chat_messages.controls.clear()
         for doc in docs:
-            d = doc.to_dict()
-            is_adm = d.get("r") == "ADMIN"
-            chat_list.controls.append(
+            m = doc.to_dict()
+            is_adm = m.get("r") == "ADMIN"
+            chat_messages.controls.append(
                 ft.Container(
                     content=ft.Column([
-                        ft.Text(f"{d.get('u')} | {d.get('time')}", size=10, color="#00FF00" if is_adm else "#555555"),
-                        ft.Text(base64.b64decode(d.get('t')).decode(), size=16, color="white")
-                    ]),
-                    padding=10, bgcolor="#0A0A0A", border=ft.border.all(1, "#1A1A1A"), border_radius=10
+                        ft.Row([
+                            ft.Text(m.get("u"), size=11, color="#00FF00" if is_adm else "#444444", weight="bold"),
+                            ft.Text(m.get("time"), size=9, color="#222222")
+                        ], justify="spaceBetween"),
+                        ft.Text(x_crypt(m.get("t"), "d"), color="#FFFFFF", size=15),
+                        ft.Image(src=m.get("img"), width=300, border_radius=10, visible=bool(m.get("img")))
+                    ], spacing=5),
+                    padding=15, bgcolor="#080808" if not is_adm else "#001200",
+                    border=ft.border.all(1, "#111111" if not is_adm else "#00FF00"),
+                    border_radius=15, margin=ft.margin.only(left=10, right=10)
                 )
             )
         page.update()
 
-    # Логин
-    def login_click(e):
-        if u_in.value == ADM_USER and p_in.value == ADM_PASS:
-            st.role = "ADMIN"
-        st.user = f"@{u_in.value}"
-        if init_db(): show_chat()
-        else: page.snack_bar = ft.SnackBar(ft.Text("DB Error!")); page.snack_bar.open = True; page.update()
-
-    u_in = ft.TextField(label="ID", border_color="#00FF00")
-    p_in = ft.TextField(label="KEY", password=True, border_color="#00FF00")
-    
-    auth_view = ft.Column([
-        ft.Icon(ft.icons.SECURITY, size=100, color="#00FF00"),
-        u_in, p_in,
-        ft.ElevatedButton("CONNECT", on_click=login_click, bgcolor="#002200", color="#00FF00")
-    ], horizontal_alignment="center", alignment="center")
-
-    def show_chat():
-        page.controls.clear()
-        msg_in = ft.TextField(expand=True)
+    # --- ЭКРАН ВХОДА (Твой логин и пароль) ---
+    def show_auth():
+        u_field = ft.TextField(label="IDENT_ID", border_color="#00FF00", color="#00FF00")
+        p_field = ft.TextField(label="ACCESS_KEY", password=True, border_color="#00FF00", can_reveal_password=True)
         
-        def send(e):
-            if msg_in.value:
-                st.db.collection("chat").add({
-                    "u": st.user, "r": st.role, 
-                    "t": base64.b64encode(msg_in.value.encode()).decode(),
+        def do_login(e):
+            if u_field.value == "adminpan" and p_field.value == "TimaIssam2026":
+                st.role = "ADMIN"
+            st.user = f"@{u_field.value}"
+            if init_matrix(): show_hub()
+            else:
+                page.snack_bar = ft.SnackBar(ft.Text("SYSTEM ERROR: Check serviceAccountKey.json")); page.snack_bar.open = True; page.update()
+
+        container.controls.clear()
+        container.controls.append(
+            ft.Container(
+                content=ft.Column([
+                    ft.Icon(ft.icons.VAPES, size=110, color="#00FF00"),
+                    ft.Text("GHOST V13 PRO", size=40, weight="bold", color="#00FF00"),
+                    ft.Divider(height=40, color="transparent"),
+                    u_field, p_field,
+                    ft.ElevatedButton("INITIALIZE UPLINK", on_click=do_login, bgcolor="#002200", color="#00FF00", width=380, height=60)
+                ], horizontal_alignment="center", alignment="center"),
+                expand=True, padding=40
+            )
+        )
+        page.update()
+
+    # --- ГЛАВНЫЙ ХАБ (Все фишки тут) ---
+    def show_hub():
+        msg_in = ft.TextField(hint_text="Type encrypted message...", expand=True, border_color="#1A1A1A")
+        
+        def send_msg(e):
+            if msg_in.value and st.db:
+                st.db.collection("messages").add({
+                    "u": st.user, "t": x_crypt(msg_in.value, "e"), "r": st.role,
                     "ts": firestore.SERVER_TIMESTAMP,
                     "time": datetime.datetime.now().strftime("%H:%M")
                 })
                 msg_in.value = ""
                 page.update()
 
-        st.db.collection("chat").order_by("ts").on_snapshot(on_msg)
-        
-        page.add(ft.Column([
-            ft.Text(f"GHOST SYSTEM: {st.user}", color="#00FF00"),
-            chat_list,
-            ft.Row([msg_in, ft.IconButton(ft.icons.SEND, on_click=send)])
-        ], expand=True))
+        if st.db:
+            st.db.collection("messages").order_by("ts", descending=False).limit_to_last(40).on_snapshot(sync_data)
+
+        container.controls.clear()
+        container.controls.append(
+            ft.Column([
+                ft.Container(
+                    content=ft.Row([
+                        ft.Column([ft.Text("ENCRYPTED", color="#00FF00", size=10), ft.Text(st.user, size=18, weight="bold")]),
+                        ft.Row([
+                            ft.IconButton(ft.icons.SUPPORT_AGENT, icon_color="#00FF00", on_click=lambda _: show_support()),
+                            ft.IconButton(ft.icons.ADMIN_PANEL_SETTINGS, icon_color="red", visible=(st.role=="ADMIN"), on_click=lambda _: show_admin())
+                        ])
+                    ], justify="spaceBetween"),
+                    padding=20, bgcolor="#0A0A0A"
+                ),
+                ft.Container(content=chat_messages, expand=True),
+                ft.Container(
+                    content=ft.Row([
+                        ft.IconButton(ft.icons.ADD_PHOTO_ALTERNATE_ROUNDED, icon_color="#444444"),
+                        msg_in,
+                        ft.IconButton(ft.icons.SEND_ROUNDED, icon_color="#00FF00", on_click=send_msg)
+                    ]),
+                    padding=20, bgcolor="#050505"
+                )
+            ], expand=True)
+        )
         page.update()
 
-    page.add(auth_view)
+    # --- АДМИН ПАНЕЛЬ (ПОЛНАЯ) ---
+    def show_admin():
+        container.controls.clear()
+        container.controls.append(
+            ft.Column([
+                ft.AppBar(title=ft.Text("ADMIN TERMINAL"), bgcolor="#990000"),
+                ft.ListTile(title=ft.Text("USER MANAGEMENT"), subtitle=ft.Text("Ban/Unban/Role change"), leading=ft.Icon(ft.icons.PERSON_SEARCH)),
+                ft.ListTile(title=ft.Text("CLEAR ALL CHATS"), leading=ft.Icon(ft.icons.DELETE_SWEEP), on_click=lambda _: print("Cleared")),
+                ft.ListTile(title=ft.Text("VIEW TICKETS"), leading=ft.Icon(ft.icons.CONFIRMATION_NUMBER)),
+                ft.ElevatedButton("EXIT TO HUB", on_click=lambda _: show_hub(), width=400)
+            ])
+        )
+        page.update()
 
-ft.app(target=main)
+    # --- ТЕХ ПОДДЕРЖКА ---
+    def show_support():
+        container.controls.clear()
+        container.controls.append(
+            ft.Column([
+                ft.AppBar(title=ft.Text("SUPPORT"), bgcolor="#004400"),
+                ft.Padding(padding=20, content=ft.Column([
+                    ft.TextField(label="Subject", border_color="#00FF00"),
+                    ft.TextField(label="Description", multiline=True, min_lines=5, border_color="#00FF00"),
+                    ft.ElevatedButton("SUBMIT REQUEST", width=400, bgcolor="#002200", color="#00FF00")
+                ])),
+                ft.TextButton("BACK", on_click=lambda _: show_hub())
+            ])
+        )
+        page.update()
+
+    show_auth()
+
+if __name__ == "__main__":
+    ft.app(target=main)
