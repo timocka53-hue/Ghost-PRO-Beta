@@ -1,188 +1,191 @@
 import flet as ft
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, storage
 import datetime
 import base64
 
 def main(page: ft.Page):
-    # --- СИСТЕМНЫЕ НАСТРОЙКИ ---
+    # Глобальные настройки дизайна (Тёмный киберпанк)
     page.title = "GHOST PRO V13: ELITE"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = "#000000"
     page.padding = 0
     page.window_width = 450
     page.window_height = 850
+    page.scroll = ft.ScrollMode.HIDDEN
 
-    class Session:
+    class GhostSystem:
         db = None
-        user = "GHOST"
+        bucket = None
+        user_id = "ANON_GHOST"
         role = "USER"
-        is_auth = False
+        is_banned = False
 
-    st = Session()
+    gs = GhostSystem()
 
-    # --- КРИПТО-ЗАГЛУШКА (ШИФРОВАНИЕ) ---
-    def encrypt_data(text):
-        return base64.b64encode(text.encode()).decode()
-
-    def decrypt_data(text):
-        try: return base64.b64decode(text.encode()).decode()
+    # --- КРИПТОГРАФИЯ (Base64 Encryption) ---
+    def crypt(text, mode="enc"):
+        try:
+            if mode == "enc":
+                return base64.b64encode(text.encode()).decode()
+            return base64.b64decode(text.encode()).decode()
         except: return text
 
-    # --- FIREBASE ENGINE ---
-    def connect_matrix():
+    # --- CONNECT TO FIREBASE ---
+    def connect_to_matrix():
         try:
             if not firebase_admin._apps:
                 cred = credentials.Certificate("serviceAccountKey.json")
-                firebase_admin.initialize_app(cred)
-            st.db = firestore.client()
+                firebase_admin.initialize_app(cred, {'storageBucket': 'YOUR_PROJECT_ID.appspot.com'})
+            gs.db = firestore.client()
+            gs.bucket = storage.bucket()
             return True
         except: return False
 
-    main_container = ft.Column(expand=True, spacing=0)
-    page.add(main_container)
+    container = ft.Column(expand=True, spacing=0)
+    page.add(container)
 
-    # --- КОМПОНЕНТЫ: ЧАТ И ЛОГИ ---
-    chat_messages = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True, spacing=10)
-    ticket_list = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True, spacing=10)
-
-    def sync_matrix(docs, changes, read_time):
-        chat_messages.controls.clear()
+    # --- UI КОМПОНЕНТЫ ---
+    message_log = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True, spacing=15)
+    
+    def on_snapshot(docs, changes, read_time):
+        message_log.controls.clear()
         for doc in docs:
             m = doc.to_dict()
             is_adm = m.get("r") == "ADMIN"
-            chat_messages.controls.append(
+            message_log.controls.append(
                 ft.Container(
                     content=ft.Column([
                         ft.Row([
-                            ft.Text(m.get("u"), size=11, color="#00FF00" if is_adm else "#555555", weight="bold"),
+                            ft.Text(m.get("u"), size=10, color="#00FF00" if is_adm else "#666666", weight="bold"),
                             ft.Text(m.get("time"), size=9, color="#222222")
                         ], justify="spaceBetween"),
-                        ft.Text(decrypt_data(m.get("t")), color="#FFFFFF", size=14),
-                        ft.Image(src=m.get("img"), width=200, visible=bool(m.get("img")))
+                        ft.Text(crypt(m.get("t"), "dec"), color="#FFFFFF", size=15),
+                        ft.Image(src=m.get("media"), width=250, border_radius=10, visible=bool(m.get("media")))
                     ], spacing=5),
-                    padding=15, bgcolor="#080808" if not is_adm else "#001500",
-                    border=ft.border.all(1, "#111111" if not is_adm else "#00FF00"),
+                    padding=15, 
+                    bgcolor="#0A0A0A" if not is_adm else "#001A00",
+                    border=ft.border.all(1, "#1A1A1A" if not is_adm else "#00FF00"),
                     border_radius=15, margin=ft.margin.only(left=10, right=10)
                 )
             )
         page.update()
 
-    # --- ЭКРАН 1: ВХОД (adminpan / TimaIssam2026) ---
-    def show_auth():
-        u_in = ft.TextField(label="IDENT_ID", border_color="#00FF00", prefix_text="@")
-        p_in = ft.TextField(label="2FA_KEY", password=True, border_color="#00FF00", can_reveal_password=True)
+    # --- ЭКРАН 1: АВТОРИЗАЦИЯ (БЕЗ КОНСОЛИ!) ---
+    def show_auth_gate():
+        u_field = ft.TextField(label="IDENT_ID", border_color="#00FF00", prefix_text="@", color="#00FF00")
+        p_field = ft.TextField(label="2FA_KEY", password=True, border_color="#00FF00", can_reveal_password=True)
         
-        def run_login(e):
-            if u_in.value == "adminpan" and p_in.value == "TimaIssam2026":
-                st.role = "ADMIN"
-            st.user = f"@{u_in.value}"
-            if connect_matrix(): show_hub()
+        def start_uplink(e):
+            if not u_field.value: return
+            
+            # Твои требования по админке
+            if u_field.value == "adminpan" and p_field.value == "TimaIssam2026":
+                gs.role = "ADMIN"
+            
+            gs.user_id = f"@{u_field.value}"
+            if connect_to_matrix():
+                show_main_hub()
             else:
-                page.snack_bar = ft.SnackBar(ft.Text("CRITICAL: NO serviceAccountKey.json FOUND"), bgcolor="red")
+                page.snack_bar = ft.SnackBar(ft.Text("CRITICAL ERROR: DB OFFLINE"), bgcolor="red")
                 page.snack_bar.open = True
                 page.update()
 
-        main_container.controls.clear()
-        main_container.controls.append(
+        container.controls.clear()
+        container.controls.append(
             ft.Container(
                 content=ft.Column([
                     ft.Icon(ft.icons.VAPES, size=100, color="#00FF00"),
-                    ft.Text("GHOST PRO V13", size=40, weight="bold", color="#00FF00"),
-                    ft.Text("ENCRYPTED DEEP-NET TERMINAL", size=10, color="#00FF00"),
-                    ft.Divider(height=40, color="transparent"),
-                    u_in, p_in,
-                    ft.ElevatedButton("INITIALIZE UPLINK", on_click=run_login, bgcolor="#002200", color="#00FF00", width=350, height=60)
+                    ft.Text("GHOST PRO V13", size=35, weight="bold", color="#00FF00"),
+                    ft.Text("ENCRYPTED NETWORK ACCESS", size=10, color="#00FF00"),
+                    ft.Divider(height=50, color="transparent"),
+                    u_field, p_field,
+                    ft.ElevatedButton("EXECUTE UPLINK", on_click=start_uplink, bgcolor="#003300", color="#00FF00", width=350, height=60)
                 ], horizontal_alignment="center", alignment="center"),
                 expand=True, padding=40
             )
         )
         page.update()
 
-    # --- ЭКРАН 2: ОСНОВНОЙ ХАБ ---
-    def show_hub():
-        msg_input = ft.TextField(hint_text="Enter data packet...", expand=True, border_color="#1A1A1A")
+    # --- ЭКРАН 2: MAIN HUB (Чат, Медиа, Админка) ---
+    def show_main_hub():
+        input_msg = ft.TextField(hint_text="Type encrypted packet...", expand=True, border_color="#1A1A1A")
         
-        def send_packet(e):
-            if msg_input.value and st.db:
-                st.db.collection("messages").add({
-                    "u": st.user, "t": encrypt_data(msg_input.value), "r": st.role,
-                    "ts": firestore.SERVER_TIMESTAMP,
+        def send_data(e):
+            if input_msg.value and gs.db:
+                gs.db.collection("messages").add({
+                    "u": gs.user_id, "t": crypt(input_msg.value, "enc"), 
+                    "r": gs.role, "ts": firestore.SERVER_TIMESTAMP,
                     "time": datetime.datetime.now().strftime("%H:%M")
                 })
-                msg_input.value = ""
+                input_msg.value = ""
                 page.update()
 
-        # Слушатель базы
-        if st.db:
-            st.db.collection("messages").order_by("ts", descending=False).limit_to_last(40).on_snapshot(sync_matrix)
+        if gs.db:
+            gs.db.collection("messages").order_by("ts", descending=False).limit_to_last(50).on_snapshot(on_snapshot)
 
-        main_container.controls.clear()
-        main_container.controls.append(
+        container.controls.clear()
+        container.controls.append(
             ft.Column([
-                # Header
+                # Панель управления
                 ft.Container(
                     content=ft.Row([
                         ft.Column([
-                            ft.Text("STATUS: SECURE", color="#00FF00", size=9),
-                            ft.Text(st.user, size=18, weight="bold", color="white")
+                            ft.Text("SIGNAL: SECURE", color="#00FF00", size=10),
+                            ft.Text(gs.user_id, size=20, weight="bold", color="white")
                         ]),
                         ft.Row([
                             ft.IconButton(ft.icons.SUPPORT_AGENT, icon_color="#00FF00", on_click=lambda _: show_support()),
-                            ft.IconButton(ft.icons.ADMIN_PANEL_SETTINGS, icon_color="red", visible=(st.role=="ADMIN"), on_click=lambda _: show_admin())
+                            ft.IconButton(ft.icons.ADMIN_PANEL_SETTINGS, icon_color="red", visible=(gs.role=="ADMIN"), on_click=lambda _: show_admin_panel())
                         ])
                     ], justify="spaceBetween"),
                     padding=20, bgcolor="#0A0A0A"
                 ),
-                # Tabs
-                ft.Tabs(
-                    selected_index=0,
-                    tabs=[ft.Tab(text="MATRIX_NET", icon=ft.icons.HUB), ft.Tab(text="PROFILE", icon=ft.icons.PERSON)],
-                    expand=False
-                ),
-                # Chat Area
-                ft.Container(content=chat_messages, expand=True, padding=10),
-                # Input
+                # Область чата
+                ft.Container(content=message_log, expand=True, padding=10),
+                # Поле ввода
                 ft.Container(
                     content=ft.Row([
-                        ft.IconButton(ft.icons.ATTACH_FILE, icon_color="#333333"),
-                        msg_input,
-                        ft.IconButton(ft.icons.SEND_ROUNDED, icon_color="#00FF00", on_click=send_packet)
+                        ft.IconButton(ft.icons.ADD_A_PHOTO, icon_color="#333333"),
+                        input_msg,
+                        ft.IconButton(ft.icons.SEND_ROUNDED, icon_color="#00FF00", on_click=send_data)
                     ]),
-                    padding=20, bgcolor="#050505"
+                    padding=20, bgcolor="#000000"
                 )
-            ], expand=True, spacing=0)
+            ], expand=True)
         )
         page.update()
 
-    # --- АДМИН ПАНЕЛЬ ---
-    def show_admin():
-        main_container.controls.clear()
-        main_container.controls.append(
+    # --- ЭКРАН 3: АДМИНКА (БАНЫ, ЧИСТКА) ---
+    def show_admin_panel():
+        container.controls.clear()
+        container.controls.append(
             ft.Column([
-                ft.AppBar(title=ft.Text("ADMIN TERMINAL"), bgcolor="#990000"),
-                ft.ListTile(title=ft.Text("BAN ALL USERS"), icon=ft.icons.BLOCK, on_click=lambda _: print("Banned")),
-                ft.ListTile(title=ft.Text("CLEAR MATRIX"), icon=ft.icons.DELETE_FOREVER, on_click=lambda _: st.db.collection("messages").get().remove()),
-                ft.ElevatedButton("BACK TO HUB", on_click=lambda _: show_hub())
+                ft.AppBar(title=ft.Text("SYSTEM OVERRIDE"), bgcolor="#660000"),
+                ft.ListTile(title=ft.Text("BAN USER @target"), leading=ft.Icon(ft.icons.PERSON_OFF), on_click=lambda _: None),
+                ft.ListTile(title=ft.Text("WIPE ALL DATA"), leading=ft.Icon(ft.icons.DELETE_FOREVER), icon_color="red", on_click=lambda _: None),
+                ft.ElevatedButton("BACK TO HUB", on_click=lambda _: show_main_hub())
             ])
         )
         page.update()
 
-    # --- ТЕХ ПОДДЕРЖКА (ТИКЕТЫ) ---
+    # --- ЭКРАН 4: ТЕХПОДДЕРЖКА ---
     def show_support():
-        main_container.controls.clear()
-        main_container.controls.append(
+        container.controls.clear()
+        container.controls.append(
             ft.Column([
-                ft.AppBar(title=ft.Text("SUPPORT TICKETS"), bgcolor="#004400"),
-                ft.Text("Open your request to administration", padding=10),
-                ft.TextField(label="Ticket Content", multiline=True),
-                ft.ElevatedButton("SUBMIT TICKET"),
-                ft.ElevatedButton("BACK", on_click=lambda _: show_hub())
+                ft.AppBar(title=ft.Text("SUPPORT TERMINAL"), bgcolor="#004400"),
+                ft.Padding(padding=20, content=ft.Column([
+                    ft.TextField(label="Subject", border_color="#00FF00"),
+                    ft.TextField(label="Problem Description", multiline=True, min_lines=5, border_color="#00FF00"),
+                    ft.ElevatedButton("SEND TICKET", width=400, bgcolor="#002200", color="#00FF00")
+                ])),
+                ft.TextButton("BACK", on_click=lambda _: show_main_hub())
             ])
         )
         page.update()
 
-    show_auth()
+    show_auth_gate()
 
 if __name__ == "__main__":
     ft.app(target=main)
