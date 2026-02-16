@@ -1,4 +1,4 @@
-name: GHOST_PRO_CORE_BUILD
+name: GHOST_PRO_ULTIMATE
 on: [push]
 
 jobs:
@@ -23,12 +23,11 @@ jobs:
 
       - name: Build APK
         run: |
-          # Убираем все лишние аргументы, чтобы flet-cli не выдавал ошибку unrecognized arguments
-          # Иконка подтянется автоматически, если она лежит в assets/icon.png
+          # Используем yes для автоответов, убираем лишние флаги
           yes | flet build apk --project "GhostPRO" --org "org.ghost"
         
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO_V13_Full_Build
+          name: GhostPRO_Final_APK
           path: build/apk/*.apk
