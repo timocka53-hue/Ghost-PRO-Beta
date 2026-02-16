@@ -1,2 +1,4 @@
 flet
 firebase-admin
+cryptography
+Pillow
