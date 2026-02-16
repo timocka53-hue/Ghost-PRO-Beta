@@ -1,4 +1,3 @@
-
 name: Build Ghost PRO
 on: [push]
 
@@ -9,25 +8,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Python Setup
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Setup Flutter
+      - name: Flutter Setup
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
 
-      - name: Install Libs
-        run: |
-          pip install flet firebase-admin
+      - name: Deps
+        run: pip install flet firebase-admin
 
       - name: Build APK
-        run: |
-          flet build apk --project "Ghost PRO"
+        run: flet build apk --project "Ghost PRO"
 
-      - name: Upload
+      - name: Artifact
         uses: actions/upload-artifact@v4
         with:
           name: GhostPRO-Final
