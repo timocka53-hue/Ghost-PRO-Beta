@@ -1,3 +1,4 @@
+
 name: Build Ghost PRO
 on: [push]
 
@@ -5,28 +6,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 2. Setup Python 3.10
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: 3. Setup Flutter Environment
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
 
-      - name: 4. Install Requirements
+      - name: Install Libs
         run: |
           pip install flet firebase-admin
 
-      - name: 5. Build Final APK
+      - name: Build APK
         run: |
           flet build apk --project "Ghost PRO"
 
-      - name: 6. Save APK to Artifacts
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: GhostPRO-Final
