@@ -1,4 +1,4 @@
-name: GHOST_PRO_FINAL
+name: GHOST_PRO_FINAL_STABLE
 on: [push]
 
 jobs:
@@ -23,11 +23,11 @@ jobs:
 
       - name: Build APK
         run: |
-          # Убираем --release, добавляем пакет из твоего json
-          flet build apk --project "GhostPRO" --org "org.ghost"
+          # Используем флаг -y для автоматического подтверждения всех запросов
+          flet build apk --project "GhostPRO" --org "org.ghost" -y
         
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO_V13_Stable
+          name: GhostPRO_V13_Ready
           path: build/apk/*.apk
