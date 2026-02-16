@@ -1,4 +1,4 @@
-name: GHOST_PRO_STABLE_BUILD
+name: GHOST_PRO_FINAL_BUILD
 on: [push]
 
 jobs:
@@ -13,6 +13,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          pip install --upgrade pip
           pip install flet cryptography firebase-admin Pillow
 
       - name: Setup Flutter
@@ -22,8 +23,8 @@ jobs:
 
       - name: Build APK
         run: |
-          # Сборка без интерактивных запросов
-          flet build apk --project "GhostPRO" --org "org.ghost" --release
+          # Используем базовую команду билда без проблемных флагов
+          flet build apk --project "GhostPRO" --org "org.ghost"
         
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
