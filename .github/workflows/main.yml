@@ -5,27 +5,29 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: 1. Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.10
+      - name: 2. Setup Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Setup Flutter
+      - name: 3. Setup Flutter Environment
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
 
-      - name: Install Libraries
-        run: pip install flet firebase-admin
+      - name: 4. Install Requirements
+        run: |
+          pip install flet firebase-admin
 
-      - name: Build Android APK
-        run: flet build apk --project "Ghost PRO"
+      - name: 5. Build Final APK
+        run: |
+          flet build apk --project "Ghost PRO"
 
-      - name: Save APK Artifact
+      - name: 6. Save APK to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO-Final-Build
+          name: GhostPRO-Final
           path: build/apk/*.apk
