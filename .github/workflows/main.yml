@@ -1,4 +1,4 @@
-name: GHOST_PRO_FINAL_BUILD
+name: GHOST_PRO_FINAL
 on: [push]
 
 jobs:
@@ -23,11 +23,11 @@ jobs:
 
       - name: Build APK
         run: |
-          # Используем базовую команду билда без проблемных флагов
+          # Убираем --release, добавляем пакет из твоего json
           flet build apk --project "GhostPRO" --org "org.ghost"
         
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO_V13_Release
+          name: GhostPRO_V13_Stable
           path: build/apk/*.apk
