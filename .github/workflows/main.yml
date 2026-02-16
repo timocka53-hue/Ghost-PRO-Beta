@@ -5,17 +5,27 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - uses: subosito/flutter-action@v2
+
+      - name: 3. Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
-      - run: pip install -r requirements.txt
-      - name: Build APK
+
+      - name: 4. Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: 5. Build APK Final
         run: flet build apk --project "Ghost PRO"
-      - uses: actions/upload-artifact@v4
+
+      - name: 6. Save APK to Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO-Final
+          name: GhostPRO-Successful-APK
           path: build/apk/*.apk
