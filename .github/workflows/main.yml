@@ -1,5 +1,4 @@
-
-name: Build_GHOST_V13
+name: Build_GHOST_PRO_V13
 on: [push]
 
 jobs:
@@ -15,8 +14,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install flet firebase-admin
-          # УБИРАЕМ ЛЮБОЕ УПОМИНАНИЕ RICH
+          pip install flet cryptography firebase-admin Pillow
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -25,12 +23,11 @@ jobs:
 
       - name: Build APK
         run: |
-          # Сначала обновляем кли, чтобы не было ошибок аргументов
-          pip install --upgrade flet
-          flet build apk --project "GhostV13"
+          # Собираем приложение с указанием названия и пакета
+          flet build apk --project "GhostMessenger"
         
-      - name: Upload
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GhostV13_Final
+          name: GhostPRO_V13_Release
           path: build/apk/*.apk
