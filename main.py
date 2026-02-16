@@ -5,8 +5,8 @@ import datetime
 import time
 
 def main(page: ft.Page):
-    # --- НАСТРОЙКИ СИСТЕМЫ GHOST ---
-    page.title = "GHOST PRO V13: MAXIMUM"
+    # Глобальные настройки системы
+    page.title = "GHOST PRO V13: ULTIMATE"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = "#000000"
     page.padding = 0
@@ -16,30 +16,31 @@ def main(page: ft.Page):
 
     class GhostState:
         db = None
-        uid = "UNREGISTERED"
+        uid = "GHOST_ANONYMOUS"
         role = "USER"
         is_connected = False
 
     st = GhostState()
-    view_canvas = ft.Column(expand=True, spacing=0)
-    page.add(view_canvas)
+    container = ft.Column(expand=True, spacing=0)
+    page.add(container)
 
-    # --- FIREBASE UPLINK ---
-    def connect_to_matrix():
+    # Функция подключения к Firebase (Matrix Uplink)
+    def connect_matrix():
         try:
             if not firebase_admin._apps:
-                # ВАЖНО: serviceAccountKey.json должен быть в корне!
+                # serviceAccountKey.json должен быть в корне репозитория!
                 cred = credentials.Certificate("serviceAccountKey.json")
                 firebase_admin.initialize_app(cred)
             st.db = firestore.client()
             st.is_connected = True
             return True
-        except: return False
+        except Exception:
+            return False
 
-    # --- КОМПОНЕНТЫ ИНТЕРФЕЙСА ---
+    # Область отображения данных (Чат)
     message_log = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True, spacing=15)
 
-    def sync_matrix_data(docs, changes, read_time):
+    def on_snapshot_receive(docs, changes, read_time):
         message_log.controls.clear()
         for doc in docs:
             m = doc.to_dict()
@@ -53,106 +54,133 @@ def main(page: ft.Page):
                         ], justify="spaceBetween"),
                         ft.Text(m.get("t"), color="#FFFFFF", size=15),
                     ], spacing=5),
-                    padding=15, bgcolor="#0A0A0A" if not is_adm else "#001A00",
+                    padding=15, 
+                    bgcolor="#0A0A0A" if not is_adm else "#001A00",
                     border=ft.border.all(1, "#1A1A1A" if not is_adm else "#00FF00"),
-                    border_radius=15, margin=ft.margin.only(left=10, right=10)
+                    border_radius=15, 
+                    margin=ft.margin.only(left=10, right=10)
                 )
             )
         page.update()
 
-    # --- ЭКРАН 1: MATRIX AUTH (БЕЗ КОНСОЛИ!) ---
-    def show_auth_panel():
-        id_input = ft.TextField(label="IDENT_ID", border_color="#00FF00", prefix_text="@", color="#00FF00")
-        key_input = ft.TextField(label="2FA_KEY", password=True, border_color="#00FF00", can_reveal_password=True)
+    # ЭКРАН 1: АВТОРИЗАЦИЯ И 2FA (ВМЕСТО КОНСОЛИ)
+    def show_auth_screen():
+        container.controls.clear()
         
-        def run_initialization(e):
-            if not id_input.value: return
-            st.uid = f"@{id_input.value}"
-            # Проверка админки
-            if id_input.value == "adminpan" and key_input.value == "TimaIssam2026":
+        user_id = ft.TextField(label="IDENT_ID", border_color="#00FF00", prefix_text="@", color="#00FF00")
+        auth_key = ft.TextField(label="2FA_ENCRYPT_KEY", password=True, border_color="#00FF00", can_reveal_password=True)
+        
+        def start_system(e):
+            if not user_id.value:
+                return
+            
+            st.uid = f"@{user_id.value}"
+            # Проверка прав администратора
+            if user_id.value == "adminpan" and auth_key.value == "TimaIssam2026":
                 st.role = "ADMIN"
             
-            if connect_to_matrix(): show_main_terminal()
+            if connect_matrix():
+                show_terminal_hub()
             else:
-                page.snack_bar = ft.SnackBar(ft.Text("ERROR: NO DATABASE LINK"))
+                page.snack_bar = ft.SnackBar(ft.Text("CRITICAL ERROR: NO DB LINK"), bgcolor="red")
                 page.snack_bar.open = True
                 page.update()
 
-        view_canvas.controls.clear()
-        view_canvas.controls.append(
+        container.controls.append(
             ft.Container(
                 content=ft.Column([
                     ft.Icon(ft.icons.SECURITY, size=100, color="#00FF00"),
-                    ft.Text("GHOST PRO V13", size=45, weight="bold", color="#00FF00"),
-                    ft.Text("ENCRYPTED ACCESS ONLY", size=12, color="#00FF00"),
+                    ft.Text("GHOST PRO V13", size=40, weight="bold", color="#00FF00"),
+                    ft.Text("SYSTEM INITIALIZATION...", size=12, color="#00FF00"),
                     ft.Divider(height=50, color="transparent"),
-                    id_input, key_input,
-                    ft.ElevatedButton("INITIALIZE UPLINK", on_click=run_initialization, bgcolor="#002200", color="#00FF00", width=350, height=60)
+                    user_id,
+                    auth_key,
+                    ft.Divider(height=20, color="transparent"),
+                    ft.ElevatedButton(
+                        "EXECUTE UPLINK", 
+                        on_click=start_system, 
+                        bgcolor="#003300", 
+                        color="#00FF00", 
+                        width=350, 
+                        height=60
+                    )
                 ], horizontal_alignment="center", alignment="center"),
                 expand=True, padding=40
             )
         )
         page.update()
 
-    # --- ЭКРАН 2: ТЕРМИНАЛ ХАБ (ПОЛНЫЙ ФУНКЦИОНАЛ) ---
-    def show_main_terminal():
-        msg_in = ft.TextField(hint_text="Type data packet...", expand=True, border_color="#1A1A1A")
+    # ЭКРАН 2: ТЕРМИНАЛ (ЧАТ + ПОИСК + АДМИНКА)
+    def show_terminal_hub():
+        container.controls.clear()
         
-        def send_packet(e):
-            if msg_in.value and st.db:
+        input_field = ft.TextField(hint_text="Type encrypted packet...", expand=True, border_color="#1A1A1A")
+        
+        def send_data(e):
+            if input_field.value and st.db:
                 st.db.collection("messages").add({
-                    "u": st.uid, "t": msg_in.value, "r": st.role,
+                    "u": st.uid, 
+                    "t": input_field.value, 
+                    "r": st.role,
                     "ts": firestore.SERVER_TIMESTAMP,
                     "time": datetime.datetime.now().strftime("%H:%M")
                 })
-                msg_in.value = ""
+                input_field.value = ""
                 page.update()
 
-        if st.db:
-            st.db.collection("messages").order_by("ts", descending=False).limit_to_last(50).on_snapshot(sync_matrix_data)
+        # Поиск (заглушка с визуалом)
+        def trigger_search(e):
+            page.snack_bar = ft.SnackBar(ft.Text("SCANNING GLOBAL NETWORK..."))
+            page.snack_bar.open = True
+            page.update()
 
-        view_canvas.controls.clear()
-        view_canvas.controls.append(
+        # Слушатель базы данных
+        if st.db:
+            st.db.collection("messages").order_by("ts", descending=False).limit_to_last(50).on_snapshot(on_snapshot_receive)
+
+        container.controls.append(
             ft.Column([
-                # Header
+                # Верхняя панель статуса
                 ft.Container(
                     content=ft.Row([
                         ft.Column([
-                            ft.Text("STATUS: CONNECTED", color="#00FF00", size=10),
+                            ft.Text("UPLINK: ACTIVE", color="#00FF00", size=10, weight="bold"),
                             ft.Row([
-                                ft.Text(st.uid, color="#FFFFFF", size=16, weight="bold"),
-                                ft.Icon(ft.icons.VERIFIED, color="#00FF00", size=18, visible=(st.role=="ADMIN"))
+                                ft.Text(st.uid, color="#FFFFFF", size=18, weight="bold"),
+                                ft.Icon(ft.icons.VERIFIED, color="#00FF00", size=20, visible=(st.role=="ADMIN"))
                             ])
                         ]),
-                        ft.IconButton(ft.icons.SEARCH, icon_color="#00FF00")
+                        ft.IconButton(ft.icons.SETTINGS_INPUT_ANTENNA, icon_color="#555555", on_click=lambda _: show_auth_screen())
                     ], justify="spaceBetween"),
-                    padding=20, bgcolor="#0D0D0D", border=ft.border.only(bottom=ft.border.BorderSide(1, "#1A1A1A"))
+                    padding=20, bgcolor="#0A0A0A", border=ft.border.only(bottom=ft.border.BorderSide(1, "#1A1A1A"))
                 ),
-                # Navigation
+                # Навигация
                 ft.Container(
                     content=ft.Row([
-                        ft.TextButton("MATRIX_HUB", icon=ft.icons.HUB, icon_color="#00FF00"),
-                        ft.TextButton("ADMIN_LOGS", icon=ft.icons.LOCK, icon_color="red", visible=(st.role=="ADMIN")),
-                    ]),
+                        ft.TextButton("GLOBAL_NET", icon=ft.icons.LANGUAGE, icon_color="#00FF00"),
+                        ft.TextButton("SEARCH", icon=ft.icons.SEARCH, icon_color="#00FF00", on_click=trigger_search),
+                        ft.TextButton("ADMIN_PANEL", icon=ft.icons.LOCK, icon_color="red", visible=(st.role=="ADMIN")),
+                    ], scroll=ft.ScrollMode.AUTO),
                     padding=5
                 ),
-                # Чат
+                # Тело чата
                 ft.Container(content=message_log, expand=True, padding=10),
-                # Ввод
+                # Поле ввода
                 ft.Container(
                     content=ft.Row([
-                        ft.IconButton(ft.icons.ADD_BOX, icon_color="#333333"),
-                        msg_in,
-                        ft.IconButton(ft.icons.SEND_ROUNDED, icon_color="#00FF00", on_click=send_packet)
+                        ft.IconButton(ft.icons.ADD_CIRCLE_OUTLINE, icon_color="#333333"),
+                        input_field,
+                        ft.IconButton(ft.icons.SEND_ROUNDED, icon_color="#00FF00", on_click=send_data)
                     ]),
-                    padding=20, bgcolor="#050505"
+                    padding=20, bgcolor="#000000"
                 )
             ], expand=True, spacing=0)
         )
         page.update()
 
-    show_auth_panel()
+    show_auth_screen()
 
 if __name__ == "__main__":
     ft.app(target=main)
+
 
