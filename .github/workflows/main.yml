@@ -5,33 +5,27 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. Скачиваем код из твоего репозитория
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      # 2. Устанавливаем Python 3.10
-      - uses: actions/setup-python@v5
+      - name: Setup Python 3.10
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 3. Устанавливаем Flutter (движок, на котором работает Flet)
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
 
-      # 4. Устанавливаем нужные библиотеки
-      - name: Install dependencies
-        run: |
-          pip install flet firebase-admin
+      - name: Install Libraries
+        run: pip install flet firebase-admin
 
-      # 5. Собираем APK
-      # Флаг --project задает имя приложения на телефоне
-      - name: Build APK
-        run: |
-          flet build apk --project "Ghost PRO"
+      - name: Build Android APK
+        run: flet build apk --project "Ghost PRO"
 
-      # 6. Сохраняем готовый файл в артефакты (откуда ты его скачаешь)
-      - name: Upload Artifact
+      - name: Save APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO-Final-APK
+          name: GhostPRO-Final-Build
           path: build/apk/*.apk
