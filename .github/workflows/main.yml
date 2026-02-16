@@ -1,21 +1,31 @@
-name: Build Ghost APK
+name: Build Ghost V13
 on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - uses: subosito/flutter-action@v2
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.19.0'
-      - run: pip install -r requirements.txt
-      - name: Build
-        run: flet build apk --project "GhostPRO"
-      - uses: actions/upload-artifact@v4
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      - name: Build APK
+        run: flet build apk --project "GhostV13"
+
+      - name: Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: Ghost-APK
+          name: GhostPRO-Successful
           path: build/apk/*.apk
