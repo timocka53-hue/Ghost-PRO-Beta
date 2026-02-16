@@ -1,176 +1,164 @@
 import flet as ft
 import firebase_admin
-from firebase_admin import credentials, firestore, storage
+from firebase_admin import credentials, firestore, storage, auth
 import datetime
-import base64
 import os
+import base64
+from cryptography.fernet import Fernet
 
-def main(page: ft.Page):
-    # --- ТВОЙ АХУЕННЫЙ ВИЗУАЛ ---
-    page.title = "GHOST PRO V13"
-    page.theme_mode = ft.ThemeMode.DARK
-    page.bgcolor = "#000000"
-    page.padding = 0
-    page.window_width = 450
-    page.window_height = 850
+# Твой ключ шифрования (в идеале тянуть из секретов)
+SECRET_KEY = b'GHOST_ULTIMATE_SECURE_KEY_2026_V13_GHOSTPRO=='
+cipher = Fernet(SECRET_KEY)
 
-    class SystemState:
-        db = None
-        bucket = None
-        user = "GHOST"
-        role = "USER"
-        is_auth = False
+class GhostMessenger:
+    def __init__(self, page: ft.Page):
+        self.page = page
+        self.user = None
+        self.role = "USER"
+        self.setup_ui()
+        self.init_firebase()
+        self.show_auth_page()
 
-    st = SystemState()
-
-    # --- ШИФРОВАНИЕ ДАННЫХ ---
-    def x_crypt(data, mode="e"):
-        try:
-            if mode == "e": return base64.b64encode(data.encode()).decode()
-            return base64.b64decode(data.encode()).decode()
-        except: return data
-
-    # --- ПОДКЛЮЧЕНИЕ БАЗЫ (АВТОМАТИЧЕСКОЕ) ---
-    def init_matrix():
+    def init_firebase(self):
         try:
             if not firebase_admin._apps:
-                cred = credentials.Certificate("serviceAccountKey.json")
-                firebase_admin.initialize_app(cred, {'storageBucket': 'ghost-v13.appspot.com'})
-            st.db = firestore.client()
-            st.bucket = storage.bucket()
-            return True
-        except: return False
-
-    container = ft.Column(expand=True, spacing=0)
-    page.add(container)
-
-    # --- ЧАТ И МЕДИА ---
-    chat_messages = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True, spacing=12)
-
-    def sync_data(docs, changes, read_time):
-        chat_messages.controls.clear()
-        for doc in docs:
-            m = doc.to_dict()
-            is_adm = m.get("r") == "ADMIN"
-            chat_messages.controls.append(
-                ft.Container(
-                    content=ft.Column([
-                        ft.Row([
-                            ft.Text(m.get("u"), size=11, color="#00FF00" if is_adm else "#444444", weight="bold"),
-                            ft.Text(m.get("time"), size=9, color="#222222")
-                        ], justify="spaceBetween"),
-                        ft.Text(x_crypt(m.get("t"), "d"), color="#FFFFFF", size=15),
-                        ft.Image(src=m.get("img"), width=300, border_radius=10, visible=bool(m.get("img")))
-                    ], spacing=5),
-                    padding=15, bgcolor="#080808" if not is_adm else "#001200",
-                    border=ft.border.all(1, "#111111" if not is_adm else "#00FF00"),
-                    border_radius=15, margin=ft.margin.only(left=10, right=10)
-                )
-            )
-        page.update()
-
-    # --- ЭКРАН ВХОДА (Твой логин и пароль) ---
-    def show_auth():
-        u_field = ft.TextField(label="IDENT_ID", border_color="#00FF00", color="#00FF00")
-        p_field = ft.TextField(label="ACCESS_KEY", password=True, border_color="#00FF00", can_reveal_password=True)
-        
-        def do_login(e):
-            if u_field.value == "adminpan" and p_field.value == "TimaIssam2026":
-                st.role = "ADMIN"
-            st.user = f"@{u_field.value}"
-            if init_matrix(): show_hub()
-            else:
-                page.snack_bar = ft.SnackBar(ft.Text("SYSTEM ERROR: Check serviceAccountKey.json")); page.snack_bar.open = True; page.update()
-
-        container.controls.clear()
-        container.controls.append(
-            ft.Container(
-                content=ft.Column([
-                    ft.Icon(ft.icons.VAPES, size=110, color="#00FF00"),
-                    ft.Text("GHOST V13 PRO", size=40, weight="bold", color="#00FF00"),
-                    ft.Divider(height=40, color="transparent"),
-                    u_field, p_field,
-                    ft.ElevatedButton("INITIALIZE UPLINK", on_click=do_login, bgcolor="#002200", color="#00FF00", width=380, height=60)
-                ], horizontal_alignment="center", alignment="center"),
-                expand=True, padding=40
-            )
-        )
-        page.update()
-
-    # --- ГЛАВНЫЙ ХАБ (Все фишки тут) ---
-    def show_hub():
-        msg_in = ft.TextField(hint_text="Type encrypted message...", expand=True, border_color="#1A1A1A")
-        
-        def send_msg(e):
-            if msg_in.value and st.db:
-                st.db.collection("messages").add({
-                    "u": st.user, "t": x_crypt(msg_in.value, "e"), "r": st.role,
-                    "ts": firestore.SERVER_TIMESTAMP,
-                    "time": datetime.datetime.now().strftime("%H:%M")
+                # Используем твой конфиг из google-services.json
+                cred = credentials.Certificate("google-services.json")
+                firebase_admin.initialize_app(cred, {
+                    'storageBucket': 'ghost-pro-5aa22.firebasestorage.app'
                 })
-                msg_in.value = ""
-                page.update()
+            self.db = firestore.client()
+            self.bucket = storage.bucket()
+        except Exception as e:
+            self.error_msg(f"DATABASE_OFFLINE: {e}")
 
-        if st.db:
-            st.db.collection("messages").order_by("ts", descending=False).limit_to_last(40).on_snapshot(sync_data)
+    def setup_ui(self):
+        self.page.title = "GHOST PRO"
+        self.page.bgcolor = "#000000"
+        self.page.theme_mode = ft.ThemeMode.DARK
+        self.page.padding = 10
 
-        container.controls.clear()
-        container.controls.append(
+    def error_msg(self, text):
+        self.page.snack_bar = ft.SnackBar(ft.Text(text, color="#FF0000"))
+        self.page.snack_bar.open = True
+        self.page.update()
+
+    # --- ШИФРОВАНИЕ ---
+    def encrypt(self, data):
+        return cipher.encrypt(data.encode()).decode()
+
+    def decrypt(self, data):
+        try: return cipher.decrypt(data.encode()).decode()
+        except: return "[ENCRYPTED_DATA]"
+
+    # --- АУТЕНТИФИКАЦИЯ И 2FA ---
+    def show_auth_page(self):
+        self.page.clean()
+        email_f = ft.TextField(label="EMAIL_ADDRESS", border_color="#00FF00")
+        pass_f = ft.TextField(label="ACCESS_PASSWORD", password=True, border_color="#00FF00")
+        
+        def handle_auth(e):
+            # Секретный вход админа
+            if email_f.value == "admin" and pass_f.value == "TimaIssam2026":
+                self.user = "SYSTEM_ADMIN"
+                self.role = "ADMIN"
+                self.show_main_hub()
+                return
+            
+            # Реальная логика (симуляция 2FA для Flet)
+            try:
+                # В реале тут: auth.get_user_by_email(email_f.value)
+                self.show_2fa_step(email_f.value)
+            except: self.error_msg("USER_NOT_FOUND")
+
+        self.page.add(
             ft.Column([
-                ft.Container(
-                    content=ft.Row([
-                        ft.Column([ft.Text("ENCRYPTED", color="#00FF00", size=10), ft.Text(st.user, size=18, weight="bold")]),
-                        ft.Row([
-                            ft.IconButton(ft.icons.SUPPORT_AGENT, icon_color="#00FF00", on_click=lambda _: show_support()),
-                            ft.IconButton(ft.icons.ADMIN_PANEL_SETTINGS, icon_color="red", visible=(st.role=="ADMIN"), on_click=lambda _: show_admin())
-                        ])
-                    ], justify="spaceBetween"),
-                    padding=20, bgcolor="#0A0A0A"
-                ),
-                ft.Container(content=chat_messages, expand=True),
-                ft.Container(
-                    content=ft.Row([
-                        ft.IconButton(ft.icons.ADD_PHOTO_ALTERNATE_ROUNDED, icon_color="#444444"),
-                        msg_in,
-                        ft.IconButton(ft.icons.SEND_ROUNDED, icon_color="#00FF00", on_click=send_msg)
-                    ]),
-                    padding=20, bgcolor="#050505"
+                ft.Text("GHOST_OS: ENCRYPTED_LINK", color="#00FF00", size=24, weight="bold"),
+                ft.Container(height=200, border=ft.border.all(1, "#00FF00"), content=ft.Text("SYSTEM: Ожидание входа...", color="#00FF00"), padding=10),
+                email_f, pass_f,
+                ft.ElevatedButton("INITIALIZE LOG_IN", on_click=handle_auth, bgcolor="#00FF00", color="black", width=400)
+            ], horizontal_alignment="center")
+        )
+
+    def show_2fa_step(self, email):
+        self.page.clean()
+        code_f = ft.TextField(label="ENTER_2FA_CODE (SENT TO EMAIL)", border_color="#00FF00")
+        
+        def verify(e):
+            if code_f.value == "1234": # Пример, тут должна быть проверка из БД/Email
+                self.user = email.split('@')[0]
+                self.show_main_hub()
+            else: self.error_msg("WRONG_CODE")
+
+        self.page.add(ft.Column([code_f, ft.ElevatedButton("VERIFY", on_click=verify, bgcolor="#00FF00", color="black")]))
+
+    # --- ГЛАВНЫЙ ХАБ ---
+    def show_main_hub(self):
+        self.page.clean()
+        chat_col = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True)
+        msg_input = ft.TextField(hint_text="Type encrypted message...", expand=True)
+
+        def send_msg(e):
+            if msg_input.value:
+                self.db.collection("messages").add({
+                    "u": self.user, "t": self.encrypt(msg_input.value), "ts": firestore.SERVER_TIMESTAMP,
+                    "type": "text"
+                })
+                msg_input.value = ""
+                self.page.update()
+
+        # Поток сообщений в реальном времени
+        def on_snapshot(docs, changes, read_time):
+            chat_col.controls.clear()
+            for doc in docs:
+                m = doc.to_dict()
+                chat_col.controls.append(
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text(m.get("u"), color="#00FF00", size=10),
+                            ft.Text(self.decrypt(m.get("t")), size=16)
+                        ]),
+                        padding=10, border=ft.border.all(1, "#111111"), border_radius=10
+                    )
                 )
-            ], expand=True)
-        )
-        page.update()
+            self.page.update()
 
-    # --- АДМИН ПАНЕЛЬ (ПОЛНАЯ) ---
-    def show_admin():
-        container.controls.clear()
-        container.controls.append(
-            ft.Column([
-                ft.AppBar(title=ft.Text("ADMIN TERMINAL"), bgcolor="#990000"),
-                ft.ListTile(title=ft.Text("USER MANAGEMENT"), subtitle=ft.Text("Ban/Unban/Role change"), leading=ft.Icon(ft.icons.PERSON_SEARCH)),
-                ft.ListTile(title=ft.Text("CLEAR ALL CHATS"), leading=ft.Icon(ft.icons.DELETE_SWEEP), on_click=lambda _: print("Cleared")),
-                ft.ListTile(title=ft.Text("VIEW TICKETS"), leading=ft.Icon(ft.icons.CONFIRMATION_NUMBER)),
-                ft.ElevatedButton("EXIT TO HUB", on_click=lambda _: show_hub(), width=400)
+        self.db.collection("messages").order_by("ts").on_snapshot(on_snapshot)
+
+        self.page.add(
+            ft.AppBar(title=ft.Text(f"GHOST: {self.user}"), bgcolor="#0A0A0A", actions=[
+                ft.IconButton(ft.icons.ADMIN_PANEL_SETTINGS, visible=(self.role=="ADMIN"), on_click=lambda _: self.show_admin())
+            ]),
+            ft.Container(content=chat_col, expand=True),
+            ft.Row([
+                ft.IconButton(ft.icons.MIC, icon_color="#00FF00"), # Для голосовых
+                ft.IconButton(ft.icons.IMAGE, icon_color="#00FF00"), # Для фото/видео
+                msg_input,
+                ft.IconButton(ft.icons.SEND, icon_color="#00FF00", on_click=send_msg)
             ])
         )
-        page.update()
 
-    # --- ТЕХ ПОДДЕРЖКА ---
-    def show_support():
-        container.controls.clear()
-        container.controls.append(
-            ft.Column([
-                ft.AppBar(title=ft.Text("SUPPORT"), bgcolor="#004400"),
-                ft.Padding(padding=20, content=ft.Column([
-                    ft.TextField(label="Subject", border_color="#00FF00"),
-                    ft.TextField(label="Description", multiline=True, min_lines=5, border_color="#00FF00"),
-                    ft.ElevatedButton("SUBMIT REQUEST", width=400, bgcolor="#002200", color="#00FF00")
-                ])),
-                ft.TextButton("BACK", on_click=lambda _: show_hub())
-            ])
+    # --- АДМИНКА ---
+    def show_admin(self):
+        self.page.clean()
+        user_id = ft.TextField(label="USER_TAG_TO_BAN")
+        
+        def broadcast(e):
+            self.db.collection("messages").add({
+                "u": "SYSTEM", "t": self.encrypt("ВНИМАНИЕ: ОБНОВИТЕ ПРИЛОЖЕНИЕ В ТГ!"),
+                "ts": firestore.SERVER_TIMESTAMP, "type": "alert"
+            })
+
+        self.page.add(
+            ft.Text("ROOT_PANEL", color="red", size=30),
+            user_id,
+            ft.Row([
+                ft.ElevatedButton("BAN", bgcolor="red", color="white"),
+                ft.ElevatedButton("UNBAN", bgcolor="green", color="white"),
+            ]),
+            ft.ElevatedButton("SEND GLOBAL NOTIFICATION", on_click=broadcast, width=400),
+            ft.ElevatedButton("BACK", on_click=lambda _: self.show_main_hub())
         )
-        page.update()
 
-    show_auth()
+ft.app(target=GhostMessenger)
 
-if __name__ == "__main__":
-    ft.app(target=main)
