@@ -19,15 +19,13 @@ jobs:
           flutter-version: '3.19.0'
 
       - name: Install Dependencies
-        run: |
-          pip install flet firebase-admin
+        run: pip install -r requirements.txt
 
       - name: Build APK Final
-        run: |
-          flet build apk --project "Ghost PRO"
+        run: flet build apk --project "Ghost PRO"
 
-      - name: Upload Artifact
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO-Full-Release
+          name: GhostPRO-Successful-APK
           path: build/apk/*.apk
