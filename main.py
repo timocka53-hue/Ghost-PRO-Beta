@@ -2,303 +2,231 @@ import flet as ft
 import firebase_admin
 from firebase_admin import credentials, firestore
 import datetime
-import time
 import base64
 import random
-import threading
+import time
 from cryptography.fernet import Fernet
 
-# ГЕНЕРАЦИЯ КЛЮЧА (Исправляет ошибку ValueError)
-# Используем стабильный 32-байтный ключ
-SAFE_KEY = base64.urlsafe_b64encode(b"GHOST_ULTIMATE_V13_32_BYTE_KEY_!")
+# ГАРАНТИРОВАННО ПРАВИЛЬНЫЙ КЛЮЧ (32 байта base64)
+# Исправляет ValueError и Incorrect padding
+SAFE_KEY = base64.urlsafe_b64encode(b"GHOST_ULTIMATE_SECURE_KEY_V13_32")
 cipher = Fernet(SAFE_KEY)
 
-class GhostMessengerUltimate:
+class GhostV13:
     def __init__(self, page: ft.Page):
         self.page = page
         self.db = None
         
-        # Настройки страницы
+        # Настройки страницы под твой дизайн
         self.page.title = "GHOST PRO V13"
         self.page.bgcolor = "#000000"
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.padding = 0
-        self.page.fonts = {
-            "RobotoMono": "https://github.com/google/fonts/raw/main/apache/robotomono/RobotoMono%5Bwght%5D.ttf"
-        }
-        self.page.theme = ft.Theme(font_family="RobotoMono")
-        
-        # Переменные сессии
-        self.user_tag = None
-        self.user_role = "USER"
+        self.page.window_full_screen = True
         
         self.init_firebase()
-        self.check_auto_login()
+        self.run_system_check()
 
     def init_firebase(self):
-        """Инициализация базы данных без зависаний"""
         try:
             if not firebase_admin._apps:
                 cred = credentials.Certificate("google-services.json")
                 firebase_admin.initialize_app(cred)
             self.db = firestore.client()
         except Exception as e:
-            print(f"CRITICAL_ERROR: Firebase not connected: {e}")
+            print(f"FIREBASE_ERROR: {e}")
 
     def crypt(self, text, mode="e"):
-        """Шифрование сообщений AES-256"""
         try:
-            if mode == "e":
-                return cipher.encrypt(text.encode()).decode()
+            if mode == "e": return cipher.encrypt(text.encode()).decode()
             return cipher.decrypt(text.encode()).decode()
-        except:
-            return "[CORRUPTED_SIGNAL]"
+        except: return "[ENCRYPTED_SIGNAL]"
 
-    def check_auto_login(self):
-        """Проверка сохраненного входа (чтобы не вылетало)"""
-        saved_tag = self.page.client_storage.get("ghost_tag")
-        saved_role = self.page.client_storage.get("ghost_role")
-        
+    def run_system_check(self):
+        # Проверяем, залогинен ли юзер (Сохранение сессии)
+        saved_tag = self.page.client_storage.get("user_tag")
         if saved_tag:
-            self.user_tag = saved_tag
-            self.user_role = saved_role
-            self.show_main_chat()
+            self.user = {
+                "tag": saved_tag, 
+                "role": self.page.client_storage.get("user_role")
+            }
+            self.show_main_interface()
         else:
-            self.show_matrix_auth()
+            self.show_auth_screen()
 
-    def show_matrix_auth(self):
-        """Экран входа с эффектом Матрицы (семерки и символы)"""
+    def show_auth_screen(self):
         self.page.clean()
         
-        # Эффект падающих символов
-        matrix_lines = []
-        for _ in range(15):
-            line = "".join(random.choices("01789ABCDEF", k=40))
-            matrix_lines.append(ft.Text(line, color="#003300", size=10, no_wrap=True))
+        # ЭФФЕКТ МАТРИЦЫ (Падающие семерки и символы)
+        matrix_bg = ft.Column([
+            ft.Row([
+                ft.Text(random.choice("017"), color="#003300", size=12, opacity=0.3) 
+                for _ in range(30)
+            ], alignment="center") for _ in range(40)
+        ], spacing=0)
 
-        email_field = ft.TextField(
-            label="IDENTITY_ID", 
+        email = ft.TextField(
+            label="EMAIL_ADDRESS", 
             border_color="#00FF00", 
-            focused_border_color="#00FF00",
             color="#00FF00",
-            prefix_icon=ft.icons.PERSON_OUTLINE
+            bgcolor="#11000000"
         )
-        pass_field = ft.TextField(
-            label="ACCESS_CODE", 
+        password = ft.TextField(
+            label="ACCESS_PASSWORD", 
             password=True, 
-            can_reveal_password=True,
-            border_color="#00FF00",
-            focused_border_color="#00FF00",
-            color="#00FF00",
-            prefix_icon=ft.icons.LOCK_OPEN
+            border_color="#00FF00", 
+            color="#00FF00"
         )
 
-        def login_process(e):
-            if not email_field.value or not pass_field.value:
-                return
-
-            # ТВОИ ДАННЫЕ АДМИНА
-            if email_field.value == "adminpan" and pass_field.value == "TimaIssam2026":
-                self.user_role = "ADMIN"
-                self.user_tag = "@admin"
-            else:
-                self.user_role = "USER"
-                self.user_tag = f"@{email_field.value.split('@')[0]}"
-
-            # Сохраняем сессию на устройстве
-            self.page.client_storage.set("ghost_tag", self.user_tag)
-            self.page.client_storage.set("ghost_role", self.user_role)
+        def login_action(e):
+            if not email.value or not password.value: return
             
-            self.show_2fa_animation()
+            # Твои данные для входа
+            if email.value == "adminpan" and password.value == "TimaIssam2026":
+                role, tag = "ADMIN", "@admin"
+            else:
+                role, tag = "USER", f"@{email.value.split('@')[0]}"
+            
+            # Сохранение сессии (Чтобы не вылетало)
+            self.page.client_storage.set("user_tag", tag)
+            self.page.client_storage.set("user_role", role)
+            self.user = {"tag": tag, "role": role}
+            
+            self.show_2fa_loading()
 
         self.page.add(
             ft.Stack([
-                ft.Column(matrix_lines, spacing=2, opacity=0.5),
+                matrix_bg,
                 ft.Container(
-                    expand=True,
-                    padding=30,
+                    expand=True, padding=25, alignment=ft.alignment.center,
                     content=ft.Column([
-                        ft.Text("GHOST_OS_V13", color="#00FF00", size=32, weight="bold"),
+                        ft.Text("GHOST_OS: ENCRYPTED_LINK", color="#00FF00", size=24, weight="bold"),
                         ft.Container(
-                            height=250, border=ft.border.all(1, "#00FF00"), 
-                            padding=20, bgcolor="#CC000000",
+                            height=250, border=ft.border.all(1, "#00FF00"), padding=15, bgcolor="#DD000000",
                             content=ft.Column([
-                                ft.Text("> INITIALIZING BOOT_SEQUENCE...", color="#00FF00"),
-                                ft.Text("> LOADING CRYPTO_CORE... OK", color="#00FF00"),
-                                ft.Text("> SYNCING NODES... OK", color="#00FF00"),
-                                ft.Text("> STATUS: STANDBY", color="#00FF00"),
+                                ft.Text("> LOADING MATRIX_ENGINE... OK", color="#00FF00", size=12),
+                                ft.Text("> SECURE_TUNNEL: ACTIVE", color="#00FF00", size=12),
+                                ft.Text("> AUTO_WIPE_12H: ENABLED", color="#00FF00", size=12),
                                 ft.Divider(color="#00FF00"),
-                                ft.Text("ОЖИДАНИЕ АВТОРИЗАЦИИ", color="#00FF00", weight="bold"),
+                                ft.Text("[SYSTEM]: Ожидание авторизации...", color="#00FF00", size=16),
                             ])
                         ),
-                        email_field,
-                        pass_field,
-                        ft.Row([
-                            ft.ElevatedButton(
-                                "REGISTRATION", 
-                                on_click=login_process,
-                                bgcolor="#00FF00", color="black", 
-                                style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=2))
-                            ),
-                            ft.ElevatedButton(
-                                "LOG_IN", 
-                                on_click=login_process,
-                                bgcolor="#00FF00", color="black",
-                                style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=2))
-                            ),
-                        ], alignment="center", spacing=20),
-                    ], horizontal_alignment="center", spacing=20)
+                        email, password,
+                        ft.ElevatedButton("REGISTRATION", on_click=login_action, bgcolor="#00FF00", color="black", width=400, height=50),
+                        ft.ElevatedButton("LOG_IN", on_click=login_action, bgcolor="#00FF00", color="black", width=400, height=50),
+                    ], horizontal_alignment="center", spacing=15)
                 )
             ])
         )
 
-    def show_2fa_animation(self):
-        """Рабочая 2FA анимация"""
+    def show_2fa_loading(self):
         self.page.clean()
-        progress = ft.ProgressBar(width=300, color="#00FF00", bgcolor="#002200")
-        status = ft.Text("DECRYPTING_IDENTITY...", color="#00FF00")
-        
+        pb = ft.ProgressBar(width=300, color="#00FF00", bgcolor="#002200")
         self.page.add(
             ft.Container(
                 expand=True, alignment=ft.alignment.center,
                 content=ft.Column([
-                    ft.Icon(ft.icons.SECURITY, color="#00FF00", size=50),
-                    status,
-                    progress
-                ], horizontal_alignment="center")
+                    ft.Text("SYNCHRONIZING 2FA...", color="#00FF00", size=20),
+                    pb,
+                    ft.Text("DECRYPTING NODES...", color="#00FF00", size=10, opacity=0.5)
+                ], horizontal_alignment="center", spacing=20)
             )
         )
-        time.sleep(1.5)
-        self.show_main_chat()
+        time.sleep(2) # Имитация взлома
+        self.show_main_interface()
 
-    def show_main_chat(self):
-        """Главный экран чата"""
+    def show_main_interface(self):
         self.page.clean()
         self.chat_messages = ft.Column(scroll=ft.ScrollMode.ALWAYS, expand=True, spacing=10)
-        message_input = ft.TextField(
-            hint_text="Введите зашифрованный сигнал...",
-            expand=True,
-            border_color="#222222",
-            focused_border_color="#00FF00",
-            color="white"
-        )
+        msg_input = ft.TextField(hint_text="Enter signal...", expand=True, border_color="#1A1A1A")
 
-        def send_message(e):
-            if message_input.value:
-                # Добавляем в Firebase
-                self.db.collection("ghost_messages").add({
-                    "user": self.user_tag,
-                    "text": self.crypt(message_input.value, "e"),
-                    "role": self.user_role,
-                    "timestamp": firestore.SERVER_TIMESTAMP,
-                    "time_str": datetime.datetime.now().strftime("%H:%M")
+        def send_signal(e):
+            if msg_input.value:
+                # Отправка в Firebase
+                self.db.collection("ghost_v13").add({
+                    "u": self.user["tag"],
+                    "m": self.crypt(msg_input.value, "e"),
+                    "r": self.user["role"],
+                    "ts": firestore.SERVER_TIMESTAMP,
+                    "t": datetime.datetime.now().strftime("%H:%M")
                 })
-                message_input.value = ""
-                # Очистка старых сообщений (раз в 12 часов)
-                self.auto_clean_task()
+                msg_input.value = ""
+                self.clean_old_data() # Очистка 12ч при каждом сообщении
                 self.page.update()
 
-        # Подписка на обновления базы данных в реальном времени
-        self.db.collection("ghost_messages").order_by("timestamp", direction="descending").limit(50).on_snapshot(self.on_db_update)
+        # Слушатель базы (Real-time)
+        self.db.collection("ghost_v13").order_by("ts", direction="descending").limit(40).on_snapshot(self.update_chat)
 
         self.page.add(
             ft.AppBar(
-                title=ft.Text(f"GHOST_NODE: {self.user_tag}", color="#00FF00"),
+                title=ft.Text(f"GHOST_CORE: {self.user['tag']}", color="#00FF00"),
                 bgcolor="#050505",
                 actions=[
-                    ft.IconButton(ft.icons.ADMIN_PANEL_SETTINGS, visible=(self.user_role=="ADMIN"), on_click=lambda _: self.show_admin_panel()),
-                    ft.IconButton(ft.icons.LOGOUT, on_click=self.logout_process)
+                    ft.IconButton(ft.icons.ADMIN_PANEL_SETTINGS, visible=(self.user["role"]=="ADMIN"), on_click=lambda _: self.show_admin_panel()),
+                    ft.IconButton(ft.icons.LOGOUT, on_click=self.logout)
                 ]
             ),
+            ft.Container(content=self.chat_messages, expand=True, padding=15),
             ft.Container(
-                content=self.chat_messages,
-                expand=True,
-                padding=15,
-                border=ft.border.only(top=ft.border.BorderSide(1, "#111111"))
-            ),
-            ft.Container(
-                bgcolor="#080808",
-                padding=10,
+                bgcolor="#080808", padding=10,
                 content=ft.Row([
-                    ft.IconButton(ft.icons.MIC_ROUNDED, icon_color="#00FF00"),
-                    message_input,
-                    ft.IconButton(ft.icons.SEND_ROUNDED, icon_color="#00FF00", on_click=send_message)
+                    ft.IconButton(ft.icons.MIC, icon_color="#00FF00"),
+                    msg_input,
+                    ft.IconButton(ft.icons.SEND, icon_color="#00FF00", on_click=send_signal)
                 ])
             )
         )
 
-    def on_db_update(self, docs, changes, read_time):
-        """Обновление списка сообщений"""
+    def update_chat(self, docs, changes, read_time):
         self.chat_messages.controls.clear()
-        # Разворачиваем, чтобы новые были внизу
-        for doc in reversed(docs):
-            data = doc.to_dict()
-            is_me = data.get("user") == self.user_tag
-            is_admin = data.get("role") == "ADMIN"
-            
+        for doc in reversed(list(docs)):
+            d = doc.to_dict()
+            is_adm = d.get("r") == "ADMIN"
             self.chat_messages.controls.append(
-                ft.Row([
-                    ft.Container(
-                        content=ft.Column([
-                            ft.Row([
-                                ft.Text(data.get("user"), color="#00FF00", size=10, weight="bold"),
-                                ft.Text(data.get("time_str"), color="#444444", size=8),
-                            ], alignment="spaceBetween"),
-                            ft.Text(self.crypt(data.get("text"), "d"), color="white", size=14),
-                        ], spacing=2),
-                        padding=12,
-                        border_radius=15,
-                        bgcolor="#111111" if not is_admin else "#001A00",
-                        border=ft.border.all(1, "#222222" if not is_admin else "#00FF00"),
-                        width=300
-                    )
-                ], alignment=ft.MainAxisAlignment.END if is_me else ft.MainAxisAlignment.START)
+                ft.Container(
+                    padding=12, border_radius=10, bgcolor="#0A0A0A",
+                    border=ft.border.all(1, "#00FF00" if is_admin else "#151515"),
+                    content=ft.Column([
+                        ft.Row([ft.Text(d.get("u"), color="#00FF00", size=10), ft.Text(d.get("t"), size=8)], justify="spaceBetween"),
+                        ft.Text(self.crypt(d.get("m"), "d"), size=14, color="white")
+                    ])
+                )
             )
         self.page.update()
 
-    def auto_clean_task(self):
-        """Удаление сообщений старше 12 часов"""
-        try:
-            now = datetime.datetime.now(datetime.timezone.utc)
-            threshold = now - datetime.timedelta(hours=12)
-            old_msgs = self.db.collection("ghost_messages").where("timestamp", "<", threshold).get()
-            for m in old_msgs:
-                m.reference.delete()
-        except:
-            pass
+    def clean_old_data(self):
+        # Авто-удаление сообщений старше 12 часов
+        now = datetime.datetime.now(datetime.timezone.utc)
+        limit = now - datetime.timedelta(hours=12)
+        old_docs = self.db.collection("ghost_v13").where("ts", "<", limit).get()
+        for doc in old_docs: doc.reference.delete()
 
     def show_admin_panel(self):
-        """Экран админки"""
         self.page.clean()
-        broadcast = ft.TextField(label="GLOBAL_SIGNAL", border_color="red", color="red")
+        broadcast = ft.TextField(label="GLOBAL_OVERRIDE", border_color="red")
         
-        def send_broadcast(e):
-            if broadcast.value:
-                self.db.collection("ghost_messages").add({
-                    "user": "[SYSTEM_OVERRIDE]",
-                    "text": self.crypt(broadcast.value, "e"),
-                    "role": "ADMIN",
-                    "timestamp": firestore.SERVER_TIMESTAMP,
-                    "time_str": "NOW"
-                })
-                self.show_main_chat()
+        def push_system(e):
+            self.db.collection("ghost_v13").add({
+                "u": "[ROOT_SYSTEM]", "m": self.crypt(broadcast.value, "e"),
+                "r": "ADMIN", "ts": firestore.SERVER_TIMESTAMP, "t": "NOW"
+            })
+            broadcast.value = ""
+            self.show_main_interface()
 
         self.page.add(
-            ft.AppBar(title=ft.Text("ADMIN_PANEL_V13"), bgcolor="#220000"),
+            ft.AppBar(title=ft.Text("ADMIN_OVERRIDE"), bgcolor="#330000"),
             ft.Column([
-                ft.Text("УПРАВЛЕНИЕ СИСТЕМОЙ", color="red", size=20, weight="bold"),
-                ft.Divider(color="red"),
+                ft.Text("SYSTEM CONTROL UNIT", color="red", size=22, weight="bold"),
                 broadcast,
-                ft.ElevatedButton("SEND_BROADCAST", on_click=send_broadcast, bgcolor="red", color="white", width=400),
-                ft.ElevatedButton("WIPE_ALL_MESSAGES", bgcolor="red", color="white", width=400),
-                ft.ElevatedButton("BACK", on_click=lambda _: self.show_main_chat(), width=400),
+                ft.ElevatedButton("EXECUTE BROADCAST", on_click=push_system, bgcolor="red", color="white", width=400),
+                ft.ElevatedButton("BACK", on_click=lambda _: self.show_main_interface(), width=400)
             ], padding=20, spacing=20)
         )
 
-    def logout_process(self, e):
-        """Полный выход из аккаунта"""
+    def logout(self, e):
         self.page.client_storage.clear()
-        self.show_matrix_auth()
+        self.show_auth_screen()
 
 if __name__ == "__main__":
-    ft.app(target=GhostMessengerUltimate)
+    ft.app(target=GhostV13)
+
