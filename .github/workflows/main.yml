@@ -1,4 +1,4 @@
-name: GHOST_PRO_FINAL_ULTIMATE
+name: GHOST_PRO_FINAL_BUILD
 on: [push]
 
 jobs:
@@ -23,11 +23,11 @@ jobs:
 
       - name: Build APK
         run: |
-          # Используем yes для авто-ответов на все запросы CLI
+          # Авто-ответ "y" на всё
           yes | flet build apk --project "GhostPRO" --org "org.ghost"
         
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO_V13_Ready
+          name: GhostPRO_Final
           path: build/apk/*.apk
