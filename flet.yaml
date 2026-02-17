@@ -3,7 +3,5 @@ app:
   package: org.ghost.ghost_messenger_secure
 assets:
   path: resources
-  include:
-    - icon.png
 android:
   icon: icon.png
