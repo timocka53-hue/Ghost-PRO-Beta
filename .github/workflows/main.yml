@@ -1,4 +1,4 @@
-name: GHOST_ULTIMATE_BUILD
+name: GHOST_PRO_V13_BUILD
 on: [push]
 
 jobs:
@@ -23,8 +23,8 @@ jobs:
         run: |
           yes | flet build apk --project "GhostPRO" --org "org.ghost"
         
-      - name: Upload
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GhostPRO_V13_Matrix
+          name: GhostPRO_Final
           path: build/apk/*.apk
