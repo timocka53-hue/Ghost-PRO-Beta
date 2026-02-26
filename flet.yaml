@@ -1,7 +1,0 @@
-app:
-  name: GhostPRO
-  package: org.ghost.ghost_messenger_secure
-assets:
-  path: resources
-android:
-  icon: icon.png
