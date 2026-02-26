@@ -1,4 +1,2 @@
 flet
-cryptography
-firebase-admin
-Pillow
+requests
